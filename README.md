@@ -65,7 +65,7 @@ The system is composed of three main containers:
 | **db** | PostgreSQL/PostGIS database storing the unified event catalog |
 | **backup** | Automated backup service ensuring database persistence |
 
-![System Architecture](images/architecture.png)
+![System Architecture](images/architecture.jpg)
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
@@ -130,3 +130,4 @@ These parameters can be modified through environment variables:
 [stars-url]: https://github.com/Josemelgahez/global-seismic-catalog/stargazers
 [issues-shield]: https://img.shields.io/github/issues/Josemelgahez/global-seismic-catalog.svg?style=for-the-badge
 [issues-url]: https://github.com/Josemelgahez/global-seismic-catalog/issues
+
