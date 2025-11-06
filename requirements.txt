@@ -1,0 +1,8 @@
+Django==5.1.4
+python-dotenv
+psycopg2-binary
+djangorestframework
+djangorestframework-gis
+django-extensions
+requests
+joblib
