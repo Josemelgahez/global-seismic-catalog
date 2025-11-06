@@ -95,8 +95,6 @@ The system is composed of three main containers:
    - **Admin panel:** [http://127.0.0.1:8000/admin/](http://127.0.0.1:8000/admin/) 
      > Default credentials: `admin / admin`
 
-<p align="right">(<a href="#top">back to top</a>)</p>
-
 ### Backup Service
 
 Database backups are created automatically by the `backup` container and stored in the `/data/backups` directory.  
@@ -130,4 +128,5 @@ These parameters can be modified through environment variables:
 [stars-url]: https://github.com/Josemelgahez/global-seismic-catalog/stargazers
 [issues-shield]: https://img.shields.io/github/issues/Josemelgahez/global-seismic-catalog.svg?style=for-the-badge
 [issues-url]: https://github.com/Josemelgahez/global-seismic-catalog/issues
+
 
