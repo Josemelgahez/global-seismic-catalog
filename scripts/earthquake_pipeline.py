@@ -38,7 +38,7 @@ if initial_sync:
     print("[*] Running initial sync (first execution)")
     last_event = Earthquake.objects.order_by("-retrieved_time").only("retrieved_time").first()
     if last_event is None:
-        start_time = today - datetime.timedelta(days=2)
+        start_time = today - datetime.timedelta(days=30)
         print("[*] No events found - fetching last 30 days.")
     else:
         start_time = last_event.retrieved_time - datetime.timedelta(days=1)
