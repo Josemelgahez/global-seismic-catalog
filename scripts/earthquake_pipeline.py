@@ -16,8 +16,7 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "backend_core.settings")
 import django
 django.setup()
 
-from django.conf import settings
-from api.models import Earthquake, DuplicateLink, IntensityCurve, Plate, Country, SyncState
+from api.models import Earthquake, DuplicateLink, IntensityCurve, Plate, Country, SyncState, CycleLog
 
 URL_IGN = "https://www.ign.es/web/resources/sismologia/tproximos/terremotos.js"
 URL_USGS = "https://earthquake.usgs.gov/fdsnws/event/1/query"
@@ -39,7 +38,7 @@ if initial_sync:
     print("[*] Running initial sync (first execution)")
     last_event = Earthquake.objects.order_by("-retrieved_time").only("retrieved_time").first()
     if last_event is None:
-        start_time = today - datetime.timedelta(days=30)
+        start_time = today - datetime.timedelta(days=2)
         print("[*] No events found - fetching last 30 days.")
     else:
         start_time = last_event.retrieved_time - datetime.timedelta(days=1)
@@ -421,27 +420,48 @@ def create_event(event_info, source):
 
 def process_events(event_data):
     counts = {"new": 0, "updated": 0, "unchanged": 0}
+    per_source = {}
 
     def handle_event(event_info):
+        source = event_info.get("source") or "UNKNOWN"
+
+        if source not in per_source:
+            per_source[source] = {
+                "new": 0,
+                "updated": 0,
+                "unchanged": 0,
+                "duplicated": 0,
+                "error": 0,
+            }
+
         try:
-            _, status = create_event(event_info, event_info.get("source"))
+            _, status = create_event(event_info, source)
+
+            if status in counts:
+                counts[status] += 1
+
+            if status in per_source[source]:
+                per_source[source][status] += 1
+
             return status
+
         except Exception as e:
+            per_source[source]["error"] += 1
             print(f"[!] Error processing {event_info.get('source_id', 'unknown')}: {e}")
             return "error"
 
     with ThreadPoolExecutor(max_workers=4) as executor:
-        results = list(executor.map(handle_event, event_data))
+        list(executor.map(handle_event, event_data))
 
-    for status in results:
-        if status in counts:
-            counts[status] += 1
-
-    return counts["new"], counts["updated"], counts["unchanged"]
+    return ( counts["new"], counts["updated"], counts["unchanged"], per_source)
 
 # ==========================================================
 
-def mark_duplicates(dt_threshold=8, dd_threshold=8, dm_threshold=0.7, source_priority={"USGS": 0, "IGN": 1, "EMSC": 2}):
+def mark_duplicates(dt_threshold=8,
+    dd_threshold=8,
+    dm_threshold=0.7,
+    source_priority={"USGS": 0, "IGN": 1, "EMSC": 2},
+):
     events = list(
         Earthquake.objects.filter(duplicate_of__isnull=True)
         .exclude(location__isnull=True)
@@ -449,13 +469,12 @@ def mark_duplicates(dt_threshold=8, dd_threshold=8, dm_threshold=0.7, source_pri
     )
 
     total_links = 0
-    total_checked = 0
     n = len(events)
 
     def process_event(i):
         event_a = events[i]
         local_links = 0
-        local_checked = 0
+        local_dup_per_source = {}
 
         for j in range(i + 1, n):
             event_b = events[j]
@@ -467,7 +486,6 @@ def mark_duplicates(dt_threshold=8, dd_threshold=8, dm_threshold=0.7, source_pri
             if event_a.source == event_b.source:
                 continue
 
-            local_checked += 1
             if event_a.magnitude is None or event_b.magnitude is None:
                 continue
 
@@ -502,16 +520,22 @@ def mark_duplicates(dt_threshold=8, dd_threshold=8, dm_threshold=0.7, source_pri
 
                 local_links += 1
 
-        return local_links, local_checked
+                dup_source = (duplicate.source or "UNKNOWN").strip() or "UNKNOWN"
+                local_dup_per_source[dup_source] = local_dup_per_source.get(dup_source, 0) + 1
+
+        return local_links, local_dup_per_source
+
+    dup_per_source = {}
 
     with ThreadPoolExecutor(max_workers=4) as executor:
         results = list(executor.map(process_event, range(n)))
 
-    for links, checked in results:
+    for links, local_dict in results:
         total_links += links
-        total_checked += checked
+        for src, cnt in local_dict.items():
+            dup_per_source[src] = dup_per_source.get(src, 0) + cnt
 
-    return total_links
+    return total_links, dup_per_source
 
 def fetch_all_events():
     sources = {
@@ -537,26 +561,84 @@ def fetch_all_events():
 
     return all_events
 
+def run_pipeline_cycle():
+    start = datetime.datetime.now(datetime.UTC)
+
+    cycle = CycleLog.objects.create(
+        started_at=start,
+        is_initial_sync=initial_sync,
+        sync_window_start=start_time,
+        sync_window_end=tomorrow,
+        success=True,
+    )
+
+    try:
+        all_events = fetch_all_events()
+
+        all_events.sort(
+            key=lambda e: (e.get("global_id"), e.get("updated_time_utc")),
+            reverse=True
+        )
+
+        unique_events = []
+        for _, group in groupby(all_events, key=itemgetter("global_id")):
+            unique_events.append(next(group))
+
+        all_events = unique_events
+
+        new_events, updated_events, unchanged, per_source = process_events(all_events)
+        total_links, dup_per_source = mark_duplicates()
+
+        for src, cnt in (dup_per_source or {}).items():
+            if src not in per_source:
+                per_source[src] = {
+                    "new": 0,
+                    "updated": 0,
+                    "unchanged": 0,
+                    "duplicated": 0,
+                    "error": 0,
+                }
+            per_source[src]["duplicated"] += int(cnt)
+
+        end = datetime.datetime.now(datetime.UTC)
+        duration = (end - start).total_seconds()
+
+        cycle.finished_at = end
+        cycle.duration_seconds = duration
+
+        cycle.new_events = new_events
+        cycle.updated_events = updated_events
+        cycle.unchanged_events = unchanged
+        cycle.duplicated_events = total_links
+
+        cycle.per_source_stats = per_source
+        cycle.success = True
+        cycle.error_message = None
+        cycle.save()
+
+        print(
+            f"[✓] Cycle completed at {end.isoformat()} ({duration:.1f}s total) | "
+            f"New: {new_events} | Updated: {updated_events} | "
+            f"Unchanged: {unchanged} | Duplicated: {total_links}"
+        )
+    except Exception as e:
+        end = datetime.datetime.now(datetime.UTC)
+        duration = (end - start).total_seconds()
+
+        cycle.finished_at = end
+        cycle.duration_seconds = duration
+        cycle.success = False
+        cycle.error_message = str(e)
+        cycle.save()
+
+        raise
+
 # ==========================================================
 
 if __name__ == "__main__":
+    cycle_type = "INITIAL SYNC" if initial_sync else "INCREMENTAL"
     start = datetime.datetime.now(datetime.UTC)
-    print(f"[*] Scheduled task triggered at {start}")
 
-    all_events = fetch_all_events()
+    print(f"[*] Scheduled task triggered at {start} ({cycle_type})")
 
-    all_events.sort(key=lambda e: (e.get("global_id"), e.get("updated_time_utc")),reverse=True)
-    unique_events = []
-    for gid, group in groupby(all_events, key=itemgetter("global_id")):
-        first = next(group)
-        unique_events.append(first)
-
-    all_events = unique_events
-
-    new_events, updated_events, unchanged = process_events(all_events)
-    total_links = mark_duplicates()
-
-    end = datetime.datetime.now(datetime.UTC)
-    duration = (end - start).total_seconds()
-
-    print(f"[✓] Cycle completed at {end.isoformat()} ({duration:.1f}s total) | New: {new_events} | Updated: {updated_events} | Unchanged: {unchanged} | Duplicated: {total_links}")
+    run_pipeline_cycle()

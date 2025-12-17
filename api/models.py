@@ -132,3 +132,40 @@ class SyncState(models.Model):
         status = "done" if self.value else "pending"
         run_time = self.last_run_at.strftime('%Y-%m-%d %H:%M:%S') if self.last_run_at else "never"
         return f"{self.key}: {status} (last run: {run_time})"
+
+class CycleLog(models.Model):
+    started_at = models.DateTimeField(help_text="UTC timestamp when the pipeline cycle started")
+    finished_at = models.DateTimeField(null=True, blank=True, help_text="UTC timestamp when the pipeline cycle finished")
+    duration_seconds = models.FloatField(null=True, blank=True, help_text="Total execution time of the cycle in seconds")
+
+    is_initial_sync = models.BooleanField(default=False, help_text="True if this cycle corresponds to the initial synchronization")
+
+    sync_window_start = models.DateTimeField(null=True, blank=True, help_text="UTC start of the temporal window processed during this cycle")
+    sync_window_end = models.DateTimeField(null=True, blank=True, help_text="UTC end of the temporal window processed during this cycle")
+
+    new_events = models.IntegerField(default=0,help_text="Number of newly created Earthquake records in total during this cycle")
+    updated_events = models.IntegerField(default=0, help_text="Number of existing Earthquake records updated in total during this cycle")
+    unchanged_events = models.IntegerField(default=0, help_text="Number of Earthquake records detected but not modified in total during this cycle")
+    duplicated_events = models.IntegerField(default=0, help_text="Number of duplicate links created during this cycle")
+
+    per_source_stats = models.JSONField(null=True, blank=True, default=dict, help_text=("Per-source statistics for this cycle. Structure: {source: {new, updated, unchanged, duplicated, error}}"))
+
+    success = models.BooleanField(default=True, help_text="False if the cycle terminated with an unrecovered error")
+    error_message = models.TextField(null=True, blank=True, help_text="Error message if success=False")
+
+    class Meta:
+        db_table = "cycles_logs"
+        ordering = ["-started_at"]
+        indexes = [
+            models.Index(fields=["started_at"]),
+            models.Index(fields=["is_initial_sync"]),
+            models.Index(fields=["success"]),
+        ]
+
+    def __str__(self):
+        cycle_type = "INITIAL SYNC" if self.is_initial_sync else "INCREMENTAL"
+        return (
+            f"{cycle_type} cycle | "
+            f"{self.started_at.isoformat()} → "
+            f"{self.finished_at.isoformat() if self.finished_at else 'running'}"
+        )

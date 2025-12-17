@@ -1,10 +1,11 @@
 from rest_framework import viewsets, filters
 from rest_framework_gis.filters import InBBoxFilter
+from rest_framework.viewsets import ReadOnlyModelViewSet
 from django_filters.rest_framework import DjangoFilterBackend
 import django_filters
 
-from .models import Earthquake
-from .serializers import EarthquakeSerializer
+from .models import Earthquake, CycleLog
+from .serializers import EarthquakeSerializer, CycleLogSerializer
 
 class EarthquakeFilter(django_filters.FilterSet):
     source = django_filters.ChoiceFilter(
@@ -48,3 +49,7 @@ class EarthquakeViewSet(viewsets.ReadOnlyModelViewSet):
     ordering_fields = ["origin_time", "retrieved_time", "magnitude", "depth_km"]
     bbox_filter_field = "location"
     bbox_filter_include_overlapping = True
+
+class CycleLogViewSet(ReadOnlyModelViewSet):
+    queryset = CycleLog.objects.all()
+    serializer_class = CycleLogSerializer
