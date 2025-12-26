@@ -110,10 +110,10 @@ Once deployed via Docker Compose, the system operates fully autonomously. A back
 
 Interaction with the unified seismic catalog is provided through the exposed service interfaces. The REST API enables access to the harmonized dataset, while an administrative web interface allows inspection of ingested events and system status:
 
-- **API endpoint:** http://127.0.0.1:8000/api/  
-- **Administrative interface:** http://127.0.0.1:8000/admin/  
+- **API endpoint:** http://localhost:8000/api/  
+- **Administrative interface:** http://localhost:8000/admin/  
 > **Default administrative interface credentials:**  
-> - Username: `admin`  
+> - Username: `admin`
 > - Password: `admin`
 
 ### Data Export
@@ -168,4 +168,5 @@ By default, a new backup is generated every 24 hours (86,400 seconds), and older
 [stars-shield]: https://img.shields.io/github/stars/Josemelgahez/global-seismic-catalog.svg?style=for-the-badge
 [stars-url]: https://github.com/Josemelgahez/global-seismic-catalog/stargazers
 [issues-shield]: https://img.shields.io/github/issues/Josemelgahez/global-seismic-catalog.svg?style=for-the-badge
+
 [issues-url]: https://github.com/Josemelgahez/global-seismic-catalog/issues
