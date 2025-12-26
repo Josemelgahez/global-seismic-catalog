@@ -80,6 +80,7 @@ The system is composed of three main containers:
 <p align="right">(<a href="#top">back to top</a>)</p>
 
 ---
+
 ## Deployment and Usage
 
 ### Requirements
@@ -105,13 +106,12 @@ The system is composed of three main containers:
 
 ### Usage
 
-Once the system has been deployed using Docker Compose, it operates fully autonomously, with a background acquisition scheduler continuously querying the supported seismic data providers (USGS, EMSC, and IGN). Newly published or updated seismic events are ingested without requiring any user intervention.
+Once deployed via Docker Compose, the system operates fully autonomously. A background acquisition scheduler continuously queries the supported seismic data providers and ingests newly published or updated events without requiring user intervention.
 
-Users can interact with the unified seismic catalog through the provided web interfaces:
+Interaction with the unified seismic catalog is provided through the exposed service interfaces. The REST API enables access to the harmonized dataset, while an administrative web interface allows inspection of ingested events and system status:
 
 - **API endpoint:** http://127.0.0.1:8000/api/  
 - **Administrative interface:** http://127.0.0.1:8000/admin/  
-
 > **Default administrative interface credentials:**  
 > - Username: `admin`  
 > - Password: `admin`
@@ -169,5 +169,3 @@ By default, a new backup is generated every 24 hours (86,400 seconds), and older
 [stars-url]: https://github.com/Josemelgahez/global-seismic-catalog/stargazers
 [issues-shield]: https://img.shields.io/github/issues/Josemelgahez/global-seismic-catalog.svg?style=for-the-badge
 [issues-url]: https://github.com/Josemelgahez/global-seismic-catalog/issues
-
-
