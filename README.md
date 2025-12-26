@@ -27,10 +27,20 @@
   <ol>
     <li><a href="#about-the-project">About the Project</a></li>
     <li><a href="#system-architecture">System Architecture</a></li>
-    <li><a href="#getting-started">Getting Started</a></li>
+    <li>
+      <a href="#deployment-and-usage">Deployment and Usage</a>
+      <ol>
+        <li><a href="#requirements">Requirements</a></li>
+        <li><a href="#deployment">Deployment</a></li>
+        <li><a href="#usage">Usage</a></li>
+        <li><a href="#data-export">Data Export</a></li>
+        <li><a href="#backup-service">Backup Service</a></li>
+      </ol>
+    </li>
     <li><a href="#contact">Contact</a></li>
   </ol>
 </details>
+
 
 ---
 
@@ -70,14 +80,17 @@ The system is composed of three main containers:
 <p align="right">(<a href="#top">back to top</a>)</p>
 
 ---
-
-## Getting Started
+## Deployment and Usage
 
 ### Requirements
-* **Docker** and **Docker Compose** installed  
-* Python 3.12+ (for local testing or extending modules)
 
-### Installation
+- **Docker** and **Docker Compose** installed.
+
+> **Operating system considerations:**
+>  - **Windows** and **macOS**: **Docker Desktop** must be installed and running before executing any Docker Compose commands.
+>  - **Linux**: **Docker Engine** must be installed, and the `docker` service must be running before executing any Docker Compose commands (e.g., `sudo systemctl start docker`).
+
+### Deployment
 
 1. Clone the repository
    ```bash
@@ -90,24 +103,52 @@ The system is composed of three main containers:
    docker compose up --build
    ```
 
-3. Access the API  
-   - **API endpoint:** [http://127.0.0.1:8000/api/](http://127.0.0.1:8000/api/)  
-   - **Admin panel:** [http://127.0.0.1:8000/admin/](http://127.0.0.1:8000/admin/) 
-     > Default credentials: `admin / admin`
+### Usage
+
+Once the system has been deployed using Docker Compose, it operates fully autonomously, with a background acquisition scheduler continuously querying the supported seismic data providers (USGS, EMSC, and IGN). Newly published or updated seismic events are ingested without requiring any user intervention.
+
+Users can interact with the unified seismic catalog through the provided web interfaces:
+
+- **API endpoint:** http://127.0.0.1:8000/api/  
+- **Administrative interface:** http://127.0.0.1:8000/admin/  
+
+> **Default administrative interface credentials:**  
+> - Username: `admin`  
+> - Password: `admin`
+
+### Data Export
+
+The unified seismic catalog can be exported directly from the running system using standard Django management commands. This enables full reproducibility of the catalog contents and facilitates offline analysis, archival, or integration into external research workflows.
+
+1. Access the application container:
+   ```bash
+   docker exec -it seismic-app bash
+   ```
+
+2. Export database models to JSON format using `dumpdata`:
+   ```bash
+   python manage.py dumpdata api.Earthquake > /app/data/earthquakes.json
+   python manage.py dumpdata api.CycleLog > /app/data/cycle_logs.json
+   ```
+
+> All exported files are written to the `/app/data/` directory inside the container, which is mapped by default to the `./data/` directory on the host system. This allows immediate access to the exported datasets without additional configuration.
+>
+> Additional models can be exported following the same pattern:
+> ```bash
+> python manage.py dumpdata api.<ModelName> > /app/data/<filename>.json
+> ```
 
 ### Backup Service
 
-Database backups are created automatically by the `backup` container and stored in the `/data/backups` directory.  
-Each backup is timestamped for traceability and rotated periodically according to the configured retention policy.
+Database backups are created automatically by the `backup` container and stored in the `/data/backups` directory. Each backup is timestamped for traceability and rotated periodically according to the configured retention policy.
 
-By default, a new backup is generated every 24 hours (86,400 seconds), and older backups are automatically deleted once they exceed a retention period of seven days.  
-These parameters can be modified through environment variables:
+By default, a new backup is generated every 24 hours (86,400 seconds), and older backups are automatically deleted once they exceed a retention period of seven days. These parameters can be modified through environment variables:
 - `BACKUP_INTERVAL_SECONDS` controls how frequently backups are created.
 - `BACKUP_RETENTION_DAYS` defines how long each backup is preserved before removal.
 
----
-
 <p align="right">(<a href="#top">back to top</a>)</p>
+
+---
 
 ## Contact
 
